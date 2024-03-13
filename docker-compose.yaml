@@ -1,0 +1,77 @@
+version: '3.7'
+
+services:
+  stock-broker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base-image
+    volumes:
+      - ./src:/home/node/app/src
+      - ./nodemon.json:/home/node/app/nodemon.json
+    environment:
+      - NODE_ENV=development
+      - PORT=7500
+      - MONGO_URL=mongodb://mongo1:27021,mongo2:27022,mongo3:27023/stockbroker?authSource=admin&replicaSet=replSet
+    container_name: stock-broker
+    networks:
+      - mongors-network  
+    image: stock-broker:latest
+    ports:
+      - '7500:7500'
+    expose:
+      - '7500'
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+    command: npm run dev
+    logging:
+      driver: "json-file"  # Redirect application logs to stdout
+      options:
+        max-size: "10m"     # Set maximum log size
+        max-file: "3"       # Set maximum number of log files
+
+  mongo1:
+    image: mongo:4.4
+    container_name: mongo1
+    ports:
+      - '27021:27017'
+    networks:
+      - mongors-network    
+    volumes:
+      - ./mongo1:/data/db
+      - ./rs-init.sh:/scripts/rs-init.sh
+    links:
+      - mongo2
+      - mongo3
+    restart: always
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "replset" ]
+
+  mongo2:
+    image: mongo:4.4
+    container_name: mongo2
+    networks:
+      - mongors-network
+    ports:
+      - '27022:27017'
+    volumes:
+      - ./mongo2:/data/db
+    restart: always  
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "replset" ]
+
+  mongo3:
+    image: mongo:4.4
+    container_name: mongo3
+    networks:
+      - mongors-network
+    ports:
+      - '27023:27017'
+    volumes:
+      - ./mongo3:/data/db
+    restart: always  
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "replset" ]
+
+networks:
+  mongors-network:
+    driver: bridge
